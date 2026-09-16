@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.DS_Store
+
+# Repository-root allowlist
+# A new top-level path is ignored until it is explicitly approved here.
+/*
+!/.github/
+!/.harness-plugins/
+!/tools/
+!/ci/
+!/scripts/
+!/AGENTS.md
+!/CLAUDE.md
+!/LICENSE
+!/README.md
+!/.gitignore
