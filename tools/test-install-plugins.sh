@@ -14,6 +14,7 @@ mkdir -p "$BIN" "$CLAUDE_TEST_CONFIG/plugins/marketplaces" "$CLAUDE_TEST_CONFIG/
 CATALOG='grill|grill-plugins|grill
 agent-work-policy|agent-work-policy-plugins|agent-work-policy
 write-doc|write-doc-plugins|write-doc
+rdb-design|rdb-design-plugins|rdb-design
 product-planning|product-planning-plugins|product-planning
 bdd-discovery-and-formulation|bdd-discovery-and-formulation-plugins|bdd-discovery-and-formulation
 domain-modeling|domain-modeling-plugins|domain-modeling
