@@ -38,6 +38,7 @@ domain-modeling|domain-modeling-plugins|domain-modeling
 collect-and-digest|collect-and-digest-plugins|collect-and-digest
 pull-request|pull-request-plugins|pull-request
 system-design|system-design-plugins|system-design
+testing-strategy|testing-strategy-plugins|testing-strategy
 development-convention|development-convention-plugins|development-convention
 go-convention|go-convention-plugins|go-convention
 agent-fleet|agent-fleet-plugins|agent-fleet-core agent-fleet-herdr
