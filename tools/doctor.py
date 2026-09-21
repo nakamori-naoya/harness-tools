@@ -48,7 +48,7 @@ def typed_yaml(path, expression):
         return None
 
 def own_marketplace(root):
-    """自分の repository が名乗る marketplace。requires の内外を分けるのに使う。両 catalog の name が正本。"""
+    """自分の repository が名乗る marketplace。requires の内外を分けるのに使う。両 catalog の name を参照元とする。"""
     for relative in ('.claude-plugin/marketplace.json', '.agents/plugins/marketplace.json'):
         catalog = root / relative
         if not catalog.is_file() or catalog.is_symlink():

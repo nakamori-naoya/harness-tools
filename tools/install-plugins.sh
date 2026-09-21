@@ -3,7 +3,7 @@
 #
 #   bash install-plugins.sh [--runtime claude|codex|both] [--owner <github owner>]
 #
-# 正本はこの file（harness-tools/tools/install-plugins.sh）。workspace root の install-plugins.sh はここへ委譲する。
+# 実装元はこの file（harness-tools/tools/install-plugins.sh）。workspace root の install-plugins.sh はここへ委譲する。
 #
 # 既定は両 runtime。導入先は personal 設定（Claude: $CLAUDE_CONFIG_DIR、Codex: $CODEX_HOME）で、
 # 未設定なら ~/.claude-personal と ~/.codex-personal を使う。
