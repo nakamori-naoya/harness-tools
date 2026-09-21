@@ -22,7 +22,7 @@
        validate-plugin-repository.py --self-test            （合成 fixture だけを検査する）
 違反があれば理由を出力して終了コード 1。
 
-正本はこの file（harness-tools/tools/validate-plugin-repository.py）1 つだけで、複製は配らない。各 plugin
+実装元はこの file（harness-tools/tools/validate-plugin-repository.py）1 つだけで、複製は配らない。各 plugin
 repository の scripts/validate.sh と workspace root の scripts/validate.sh、CI の共通 step（ci/validate.sh）が
 兄弟 checkout の harness-tools からこの file を呼ぶ。
 """

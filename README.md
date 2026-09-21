@@ -1,6 +1,6 @@
 # harness-tools
 
-harness-pluginsv2 の全 plugin repository が共有する保守 tool の正本である。各 repository は兄弟 checkout `../harness-tools/` の tool を呼び、複製を持たない。同期機構は無い。plugin package ではないので、marketplace も runtime manifest も持たず、`install-plugins.sh` の導入対象にも root validator の検査対象にもならない。
+harness-pluginsv2 の全 plugin repository が共有する保守 tool の基準資料である。各 repository は兄弟 checkout `../harness-tools/` の tool を呼び、複製を持たない。同期機構は無い。plugin package ではないので、marketplace も runtime manifest も持たず、`install-plugins.sh` の導入対象にも root validator の検査対象にもならない。
 
 前提 CLI: `python3`（3.10 以上）、`bash`、`jq`、`rg`（ripgrep）、mikefarah 版 `yq` v4。
 
@@ -141,5 +141,5 @@ bash scripts/validate.sh
 
 ## 規則
 
-- tool へ条件を足すときは、[機械検査と意味評価の境界](/Users/naoya-nakamoriq/Documents/Github/harness-pluginsv2/.agents/rules/deterministic-validation.md)の宣言（正本・入力・正規化・合格述語・診断・正例・反例・境界例・意味評価として残す範囲）を先に書く。root 契約の宣言は [plugin package の公開境界と自己完結](/Users/naoya-nakamoriq/Documents/Github/harness-pluginsv2/.agents/rules/plugin-package-contract.md) にある。
-- 後方互換の alias / fallback / 二重正本を作らない。tool の引数を変えたら、呼び手（各 repository の `scripts/validate.sh`、この README）を同じ変更で直す。
+- tool へ条件を足すときは、[機械検査と意味評価の境界](/Users/naoya-nakamoriq/Documents/Github/harness-pluginsv2/.agents/rules/deterministic-validation.md)の宣言（基準資料・入力・正規化・合格述語・診断・正例・反例・境界例・意味評価として残す範囲）を先に書く。root 契約の宣言は [plugin package の公開境界と自己完結](/Users/naoya-nakamoriq/Documents/Github/harness-pluginsv2/.agents/rules/plugin-package-contract.md) にある。
+- 後方互換の alias / fallback / 基準資料の重複を作らない。tool の引数を変えたら、呼び手（各 repository の `scripts/validate.sh`、この README）を同じ変更で直す。

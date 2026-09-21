@@ -59,7 +59,7 @@ ASSIGN = re.compile(
 
 
 def load_resolver():
-    """${.deps…} の解析と候補探索は、隣の resolve-dependency.py と共有する（正本は 1 つ）。"""
+    """${.deps…} の解析と候補探索は、隣の resolve-dependency.py と共有する（解析実装は 1 つ）。"""
     resolver = Path(__file__).resolve().with_name("resolve-dependency.py")
     if not resolver.is_file():
         raise ValueError("resolve-dependency.py が隣に無い: " + str(resolver))
@@ -178,7 +178,7 @@ def public_skill_names(package_root: Path, runtime: str) -> set[str]:
 
 
 def own_marketplace(repo: Path, runtime: str) -> str | None:
-    """自 repository の marketplace 名。両 catalog の name が正本（plugin-package-contract.md）。"""
+    """自 repository の marketplace 名。両 catalog の name を参照元とする（plugin-package-contract.md）。"""
     relative = ".agents/plugins/marketplace.json" if runtime == "codex" else ".claude-plugin/marketplace.json"
     catalog = repo / relative
     if not catalog.is_file():
