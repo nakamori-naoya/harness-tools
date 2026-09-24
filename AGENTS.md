@@ -11,3 +11,7 @@ harness-pluginsv2 の全 plugin repository が共有する保守 tool の基準�
 - 後方互換の alias / fallback / 基準資料の重複を作らない。tool の引数を変えたら、呼び手（各 repository の `scripts/validate.sh`、README の呼び方）を同じ変更で直す。
 
 変更後は `bash scripts/validate.sh` を実行する。plugin repository 側の検査は、その repository で `bash scripts/validate.sh` を、workspace root で `bash scripts/validate.sh <repository の絶対 path>` を実行する。
+
+## 検査スクリプトは、意味が一意に決まることだけを判定する
+
+このrepositoryの検査スクリプト（validate、lint、verify、checkなど、名前を問わない）が判定してよいのは、ファイルや見出しの有無、識別子や版の一致、宣言と配置の対応、禁止された書き方の有無のように、入力と基準資料から意味が決定論的に一意に決まることだけである。読んで解釈しないと決まらないことや、件数や語の出現のような品質の代わりの指標は判定せず、エージェントが読んで評価する（意味評価）。判定が一意に決まることを宣言できない検査は作らず、詳しい条件は `/Users/naoya-nakamoriq/Documents/Github/harness-pluginsv2/.agents/rules/deterministic-validation.md` に従う。
