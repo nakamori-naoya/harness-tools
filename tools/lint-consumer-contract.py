@@ -27,25 +27,8 @@ import subprocess
 import sys
 
 
-# manifest から生成できない語（保存モード名・CLI引数）だけを手で持つ。
-# 内部plugin名・内部skill名・工程idは provider manifest から生成する（internal_vocabulary）。
-#
-# **手書きの語も、その持ち主が「外部依存として実在するとき」だけ有効にする。**
-# 提供側 repository 自身の内部参照（自分の decision.py や自分の control.py）は
-# 消費ではないので検出しない。所属 bundle 内の参照は §3 のとおり規則の対象外である。
-FIXED_VOCABULARY = {
-    "write-doc": ("save-vocabulary", [
-        "replace-existing-target", "--template", "--output-dir",
-        '"decision":"exists"', "logical_update_target", "author-document",
-    ]),
-    "grill": ("dialogue-internal", [
-        "ask-until-agreed",
-    ]),
-    "agent-work-policy": ("policy-internal", [
-        "control.py", "POLICY_ROOT", "--policy-root", "operation-contract.md",
-        "apply-work-policy", "work-policy-control",
-    ]),
-}
+# 検出する語は、依存先の manifest から作るもの（内部plugin名・内部skill名・工程id）だけにする。
+# 基準資料に宣言の無い手書きの語の一覧は持たない（語の出現は、一意に決まる判定にならないため）。
 
 TEXT_SUFFIXES = {".md", ".yml", ".yaml", ".sh", ".py", ".json", ".txt"}
 SKIP_DIRECTORIES = {".git", "__pycache__", "node_modules", ".harness-plugin-test-cache"}
@@ -271,16 +254,11 @@ def scan(repo: Path, runtime: str) -> list[dict]:
 
     vocabulary: dict[str, str] = {}
     public_skills: dict[str, str] = {}
-    # 手書き語は、その持ち主が外部依存として実在するときだけ効かせる。
-    fixed: list[tuple[str, str, str]] = []
     for name, info in external_logical.items():
         for word in info["vocabulary"]:
             vocabulary.setdefault(word, name)
         for word in info["skills"]:
             public_skills.setdefault(word, name)
-        code, words = FIXED_VOCABULARY.get(name, (None, []))
-        for word in words:
-            fixed.append((code, word, name))
     step_ids: dict[str, str] = {}
     for name, info in external_logical.items():
         for word in info.get("steps") or ():
@@ -333,26 +311,15 @@ def scan(repo: Path, runtime: str) -> list[dict]:
                 if re.search(r"[\"'$]?\$\{?" + re.escape(variable) + r"\}?/", line) and number != origin:
                     report("external-dependency-exec", path, number,
                            f"{variable}（{origin}行で .deps.{dep} から代入）: " + line.strip()[:120])
-            # 工程idは名指しの形（--check-steps <id> / --step <id> /
-            # ${.deps.<外部>...} と同じ行）でだけ照合する。
+            # 工程idは名指しの構文（--check-steps <id> / --step <id>）でだけ照合する。
+            # 同じ行に普通の語として現れるだけでは違反にしない。
             for invoked in STEP_INVOCATION.findall(line):
                 if invoked in step_ids:
                     report("provider-internal-name", path, number,
                            f"{invoked}（{step_ids[invoked]} の工程id）")
-            for name, _segments, _suffix, _raw in module.dep_references(line):
-                if name not in external_logical:
-                    continue
-                for word, owner in step_ids.items():
-                    if owner == name and re.search(
-                            r"(?<![A-Za-z0-9_-])" + re.escape(word) + r"(?![A-Za-z0-9_-])", line):
-                        report("provider-internal-name", path, number,
-                               f"{word}（{owner} の工程id）")
             for word, owner in vocabulary.items():
                 if re.search(r"(?<![A-Za-z0-9_-])" + re.escape(word) + r"(?![A-Za-z0-9_-])", line):
                     report("provider-internal-name", path, number, f"{word}（{owner} の内部名）")
-            for code, word, owner in fixed:
-                if word in line:
-                    report(code, path, number, f"{word}（{owner} の内部語）")
 
     # 外部playbookの設定ファイル（<repo>/.harness-plugins/<外部名>.config.yml と
     # scopes/*/<外部名>.config.yml）に相手の工程を並べ直すのも「内部の作りの想定」である。

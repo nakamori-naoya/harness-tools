@@ -617,7 +617,7 @@ class Hardening(unittest.TestCase):
                                 text=True, capture_output=True, env=environment, timeout=120)
         self.assertEqual(linted.returncode, 1, linted.stdout + linted.stderr)
         codes = {finding['code'] for finding in json.loads(linted.stdout)['findings']}
-        self.assertEqual(codes, {'provider-internal-name', 'save-vocabulary'})
+        self.assertEqual(codes, {'provider-internal-name'})
     def test_consumer_lint_parses_skill_frontmatter_as_yaml(self):
         """quoted/commented nameを受理し、本文の偽nameをidentityにしない。"""
         spec = importlib.util.spec_from_file_location('consumer_lint_frontmatter', TOOLS/'lint-consumer-contract.py')
