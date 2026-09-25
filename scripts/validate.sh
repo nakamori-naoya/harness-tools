@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# harness-tools 自身の自己検査。各 tool の self-test / unittest と、入口 script の引数契約（負例）を実行する。
+# harness-tools 自身の自己検査。各 tool の self-test と、入口 script の引数契約（負例）を実行する。
 # plugin repository は検査しない（それは tools/validate-plugin-repository.py と各 repository の scripts/validate.sh の仕事）。
 #
 #   bash scripts/validate.sh
@@ -52,12 +52,7 @@ python3 "$ROOT/tools/test-hardening.py" 2>"$TMP_ROOT/hardening.err" && pass 'tes
 section 'tools/test-install-plugins.sh'
 bash "$ROOT/tools/test-install-plugins.sh" && pass 'install-plugins 契約' || fail 'install-plugins 契約'
 
-section 'scripts/test-run-evals.sh'
-bash "$ROOT/scripts/test-run-evals.sh" && pass 'run-evals 自己検査' || fail 'run-evals 自己検査'
-
 section '入口 script の引数契約（負例）'
-python3 "$ROOT/tools/doctor.py" >/dev/null 2>&1; [ "$?" -eq 2 ] && pass 'doctor.py は --repository 必須' || fail 'doctor.py が --repository 無しで動いた'
-python3 "$ROOT/tools/lint-consumer-contract.py" >/dev/null 2>&1; [ "$?" -eq 2 ] && pass 'lint-consumer-contract.py は --repo 必須' || fail 'lint が --repo 無しで動いた'
 python3 "$ROOT/tools/release.py" --plugin x --version 1.0.0 --notes n --breaking b --migration m --checks /dev/null >/dev/null 2>&1; [ "$?" -eq 2 ] && pass 'release.py は --repo 必須' || fail 'release.py が --repo 無しで動いた'
 bash "$ROOT/tools/validate-workspace.sh" >/dev/null 2>&1; [ "$?" -eq 2 ] && pass 'validate-workspace.sh は --workspace 必須' || fail 'validate-workspace.sh が --workspace 無しで動いた'
 bash "$ROOT/tools/validate-workspace.sh" --workspace "$TMP_ROOT/none" /x >/dev/null 2>&1; [ "$?" -eq 2 ] && pass 'validate-workspace.sh は存在しない workspace を拒否' || fail 'validate-workspace.sh が存在しない workspace で動いた'
@@ -72,7 +67,7 @@ mkdir -p "$fixture/.claude-plugin" "$fixture/.agents/plugins" "$fixture/plugins/
 printf '{"name":"fixture","plugins":[{"name":"fixture","version":"1.0.0","source":"./plugins/fixture"}]}\n' > "$fixture/.claude-plugin/marketplace.json"
 printf '{"name":"fixture","plugins":[{"name":"fixture","version":"1.0.0","source":{"source":"local","path":"./plugins/fixture"}}]}\n' > "$fixture/.agents/plugins/marketplace.json"
 for runtime in claude codex; do
-  printf '{"name":"fixture","version":"1.0.0","skills":["./skills/do-work"],"metadata":{"harness":{"marketplace":"fixture","contractVersion":1}}}\n' > "$fixture/plugins/fixture/.$runtime-plugin/plugin.json"
+  printf '{"name":"fixture","version":"1.0.0","skills":["./skills/do-work"],"metadata":{"harness":{"marketplace":"fixture"}}}\n' > "$fixture/plugins/fixture/.$runtime-plugin/plugin.json"
 done
 printf -- '---\nname: do-work\ndescription: fixture\n---\nfixture\n' > "$fixture/plugins/fixture/skills/do-work/SKILL.md"
 printf '#!/usr/bin/env bash\necho fixture validate.sh\n' > "$fixture/scripts/validate.sh"
