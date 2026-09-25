@@ -7,7 +7,7 @@ release.py は合成 fixture だけで検査する。--repository を渡した�
 .github/workflows/validate.yml の action がすべて commit SHA で固定されているかも検査する。
 
 基準資料: release.py の引数契約と、workflow の `uses:` の値
-合格述語: release.py が両 marketplace と両 manifest の version だけを書き換え、欠けた manifest では何も書かずに失敗し、
+合格述語: release.py が両 marketplace と両 manifest の version だけを書き換えて記録の file を作らず、欠けた manifest では何も書かずに失敗し、
   不正な semver を拒む。workflow の `uses:` はすべて `<owner>/<repo>@<40 桁の SHA>` である
 意味評価として残す範囲: どの action を使うべきか、release の中身が適切か
 """
@@ -57,23 +57,21 @@ class Hardening(unittest.TestCase):
             path.parent.mkdir(parents=True)
             path.write_text(json.dumps({'name': 'fixture', 'version': '0.4.0', 'hooks': './hooks/x.json'}))
         sidecar_before = {str(path): path.read_bytes() for path in sidecar.rglob('plugin.json')}
-        checks = self.base/'checks.json'
-        checks.write_text('{"codex":"unverified","claude":"unverified"}')
-        common = ['--notes', 'change', '--breaking', 'yes', '--migration', 'new run', '--checks', checks]
-        r = self.call('python3', TOOLS/'release.py', '--repo', repo, '--plugin', 'fixture', '--version', '2.0.0', *common, '--apply')
+        r = self.call('python3', TOOLS/'release.py', '--repo', repo, '--plugin', 'fixture', '--version', '2.0.0', '--apply')
         self.assertEqual(r.returncode, 0, r.stderr)
         for runtime in ['codex', 'claude']:
             data = json.loads((repo/f'plugins/p/.{runtime}-plugin/plugin.json').read_text())
             self.assertEqual(data['version'], '2.0.0')
             self.assertEqual(data['requires'], [{'plugin': 'other', 'marketplace': 'other'}])
         self.assertEqual(sidecar_before, {str(path): path.read_bytes() for path in sidecar.rglob('plugin.json')})
+        self.assertFalse((repo/'releases').exists())
         (repo/'plugins/p/.claude-plugin/plugin.json').unlink()
         before = {str(p): p.read_bytes() for p in repo.rglob('*.json')}
-        r = self.call('python3', TOOLS/'release.py', '--repo', repo, '--plugin', 'fixture', '--version', '3.0.0', *common, '--apply')
+        r = self.call('python3', TOOLS/'release.py', '--repo', repo, '--plugin', 'fixture', '--version', '3.0.0', '--apply')
         self.assertNotEqual(r.returncode, 0)
         self.assertEqual(before, {str(p): p.read_bytes() for p in repo.rglob('*.json')})
         for version in ['1.0.0-alpha..1', '1.0.0-.', '1.0.0-01']:
-            r = self.call('python3', TOOLS/'release.py', '--repo', repo, '--plugin', 'fixture', '--version', version, *common)
+            r = self.call('python3', TOOLS/'release.py', '--repo', repo, '--plugin', 'fixture', '--version', version)
             self.assertEqual(r.returncode, 2)
 
 

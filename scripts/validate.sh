@@ -53,7 +53,7 @@ section 'tools/test-install-plugins.sh'
 bash "$ROOT/tools/test-install-plugins.sh" && pass 'install-plugins 契約' || fail 'install-plugins 契約'
 
 section '入口 script の引数契約（負例）'
-python3 "$ROOT/tools/release.py" --plugin x --version 1.0.0 --notes n --breaking b --migration m --checks /dev/null >/dev/null 2>&1; [ "$?" -eq 2 ] && pass 'release.py は --repo 必須' || fail 'release.py が --repo 無しで動いた'
+python3 "$ROOT/tools/release.py" --plugin x --version 1.0.0 >/dev/null 2>&1; [ "$?" -eq 2 ] && pass 'release.py は --repo 必須' || fail 'release.py が --repo 無しで動いた'
 bash "$ROOT/tools/validate-workspace.sh" >/dev/null 2>&1; [ "$?" -eq 2 ] && pass 'validate-workspace.sh は --workspace 必須' || fail 'validate-workspace.sh が --workspace 無しで動いた'
 bash "$ROOT/tools/validate-workspace.sh" --workspace "$TMP_ROOT/none" /x >/dev/null 2>&1; [ "$?" -eq 2 ] && pass 'validate-workspace.sh は存在しない workspace を拒否' || fail 'validate-workspace.sh が存在しない workspace で動いた'
 bash "$ROOT/ci/validate.sh" >/dev/null 2>&1; [ "$?" -eq 2 ] && pass 'ci/validate.sh は絶対 path 必須' || fail 'ci/validate.sh が引数無しで動いた'

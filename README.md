@@ -12,7 +12,7 @@ harness-pluginsv2 の全 plugin repository が共有する保守 tool を、一�
 |---|---|
 | `tools/validate-plugin-repository.py` | package の配置と manifest の検査。`--self-test` で合成 fixture の正例と反例を確かめる |
 | `tools/validate-workspace.sh` | workspace の規約の置き場と、明示した repository への配置の検査。workspace の `scripts/validate.sh` が委譲する |
-| `tools/release.py` | 両 marketplace と両 runtime manifest の version を同時に上げる |
+| `tools/release.py` | 両 marketplace と両 runtime manifest の version を同時に上げる。記録の file は作らず、変更の要点は commit と PR が持つ |
 | `tools/test-hardening.py` | release.py の回帰検査。`--repository` を渡すと、その repository の CI の action が SHA で固定されているかも見る |
 | `tools/install-plugins.sh` | GitHub の marketplace 経由で全 plugin を Claude Code と Codex へ導入し、導入後の version と source を照合する |
 | `tools/test-install-plugins.sh` | install-plugins.sh の照合を stub の CLI で検査する |

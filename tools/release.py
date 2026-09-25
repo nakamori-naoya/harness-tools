@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
-"""Plan/apply an identity-scoped release; never rewrite dependency declarations.
+"""両 marketplace と両 runtime manifest の version を同時に上げる。
 
-  release.py --repo <plugin repository の絶対path> --plugin <名> --version <semver>
-             --notes <text> --breaking <text> --migration <text> --checks <JSON file> [--apply]
+  release.py --repo <plugin repository の絶対path> --plugin <名> --version <semver> [--apply]
 
---apply 無しは計画 JSON を返すだけ。--apply で両 marketplace と両 runtime manifest の version を
-同時に更新し、releases/<plugin>-<version>.json を書く（既存の記録があれば拒否）。
+--apply 無しは書き換える file の計画を JSON で返すだけ。--apply で書き換える。
+変更の要点は commit と PR が持ち、この tool は記録の file を作らない。
 """
 import argparse
-import datetime
 import json
 import os
 import tempfile
@@ -22,10 +20,6 @@ def main():
     p.add_argument('--repo', required=True, help='released plugin repository (absolute path)')
     p.add_argument('--plugin', required=True)
     p.add_argument('--version', required=True)
-    p.add_argument('--notes', required=True)
-    p.add_argument('--breaking', required=True)
-    p.add_argument('--migration', required=True)
-    p.add_argument('--checks', required=True, help='JSON file with actual runtime validation results')
     p.add_argument('--apply', action='store_true')
     a = p.parse_args()
     if not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?', a.version):
@@ -72,29 +66,21 @@ def main():
         package = candidate.resolve()
         identity = current_identity
         publications.append((catalog_path, catalog, entry, manifest_path, manifest))
-    checks = json.loads(Path(a.checks).read_text())
-    if not all(runtime in checks for runtime in ['codex', 'claude']):
-        p.error('checks must explicitly record codex and claude results (including unverified)')
     changed = {}
     for catalog_path, catalog, entry, manifest_path, manifest in publications:
         entry['version'] = a.version
         manifest['version'] = a.version
         changed[str(catalog_path.relative_to(root))] = catalog
         changed[str(manifest_path.relative_to(root))] = manifest
-    record = {'schema': 1, 'plugin': a.plugin, 'version': a.version, 'created_at': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'notes': a.notes, 'breaking': a.breaking, 'migration': a.migration, 'checks': checks, 'files': list(changed)}
+    plan = {'plugin': a.plugin, 'version': a.version, 'files': list(changed)}
     if a.apply:
-        record_path = root / 'releases' / (a.plugin + '-' + a.version + '.json')
-        if record_path.exists():
-            p.error('release record already exists')
         content = {root / relative: json.dumps(data, ensure_ascii=False, indent=2) + '\n' for relative, data in changed.items()}
-        content[record_path] = json.dumps(record, ensure_ascii=False, indent=2) + '\n'
         for path in content:
             if path.is_symlink() or any(parent.is_symlink() for parent in path.parents if parent != root):
                 p.error('release target symlink')
         originals = {path: path.read_bytes() if path.exists() else None for path in content}
         staged = {}
         try:
-            record_path.parent.mkdir(exist_ok=True)
             for path, text in content.items():
                 fd, name = tempfile.mkstemp(prefix='.release-', dir=path.parent)
                 with os.fdopen(fd, 'w') as output:
@@ -112,7 +98,7 @@ def main():
         finally:
             for temporary in staged.values():
                 temporary.unlink(missing_ok=True)
-    print(json.dumps({'applied': a.apply, 'release': record}, ensure_ascii=False, indent=2))
+    print(json.dumps({'applied': a.apply, 'release': plan}, ensure_ascii=False, indent=2))
 
 if __name__ == '__main__':
     main()
