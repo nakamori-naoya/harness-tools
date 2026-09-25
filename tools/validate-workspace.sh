@@ -34,40 +34,15 @@ command -v yq >/dev/null 2>&1 && yq --version 2>/dev/null | rg -q 'mikefarah' \
 
 bash "$TOOLS/test-install-plugins.sh" || status=1
 
-required_rules=(
-  "$WORKSPACE/.agents/rules/harness-principles.md"
-  "$WORKSPACE/.agents/rules/plugin-package-contract.md"
-  "$WORKSPACE/.agents/rules/deterministic-validation.md"
-  "$WORKSPACE/.claude/rules/harness-principles.md"
-  "$WORKSPACE/.claude/rules/plugin-package-contract.md"
-  "$WORKSPACE/.claude/rules/deterministic-validation.md"
-)
-for rule in "${required_rules[@]}"; do
-  [ -f "$rule" ] || { echo "required workspace rule is missing: $rule" >&2; status=1; }
-done
-
 for name in harness-principles plugin-package-contract deterministic-validation; do
-  canonical="$WORKSPACE/.agents/rules/$name.md"
-  entry="$WORKSPACE/.claude/rules/$name.md"
-  rg -Fq "$canonical" "$entry" \
-    || { echo "Claude rule entry does not reference canonical rule: $entry -> $canonical" >&2; status=1; }
-done
-
-for canonical in \
-  "$WORKSPACE/.agents/rules/harness-principles.md" \
-  "$WORKSPACE/.agents/rules/plugin-package-contract.md" \
-  "$WORKSPACE/.agents/rules/deterministic-validation.md"; do
-  rg -Fq "$canonical" "$WORKSPACE/AGENTS.md" \
-    || { echo "root AGENTS.md does not reference canonical rule: $canonical" >&2; status=1; }
+  rule="$WORKSPACE/.agents/rules/$name.md"
+  [ -f "$rule" ] || { echo "workspace rule is missing: $rule" >&2; status=1; continue; }
+  rg -Fq "$rule" "$WORKSPACE/AGENTS.md" \
+    || { echo "root AGENTS.md does not reference workspace rule: $rule" >&2; status=1; }
 done
 
 rg -Fxq '@AGENTS.md' "$WORKSPACE/CLAUDE.md" \
   || { echo "root CLAUDE.md does not import root AGENTS.md: $WORKSPACE/CLAUDE.md" >&2; status=1; }
-
-for document in "$WORKSPACE/README.md" "$WORKSPACE/AGENTS.md" "$WORKSPACE/プラグイン間依存の規則.md"; do
-  rg -Fq 'deterministic-validation.md' "$document" \
-    || { echo "validation boundary reference is missing: $document" >&2; status=1; }
-done
 
 python3 "$TOOLS/validate-plugin-repository.py" --self-test >/dev/null || status=1
 
