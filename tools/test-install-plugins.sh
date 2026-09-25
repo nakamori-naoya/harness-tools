@@ -239,4 +239,23 @@ for bad in "$TEST_ROOT/wrong-codex-marketplaces.json" "$TEST_ROOT/multi-codex-ma
 done
 mv "$TEST_ROOT/codex-marketplaces-valid.json" "$TEST_ROOT/codex-marketplaces.json"
 
-echo 'Install contract self-test: passed (single-value initial JSON/schema fail-closed with zero mutations, mixed Codex local/remote entries, Claude user scope, CLI nonzero, post-state identity/version/source/scope mismatch)'
+# 設定の置き場が symlink（~/.codex-personal -> ~/.codex）でも、CLI が返す実体のパスと照合できる。
+ln -s "$CLAUDE_TEST_CONFIG" "$TEST_ROOT/claude-link"
+printf '0\n' > "$TEST_ROOT/claude-list-calls"
+: > "$TEST_ROOT/claude-mutations"
+env PATH="$BIN:/usr/bin:/bin" CLAUDE_CONFIG_DIR="$TEST_ROOT/claude-link" \
+  STUB_MARKETPLACES="$TEST_ROOT/claude-marketplaces.json" STUB_PLUGINS_BEFORE="$TEST_ROOT/claude-plugins.json" STUB_PLUGINS_AFTER="$TEST_ROOT/claude-plugins.json" \
+  STUB_LIST_CALLS="$TEST_ROOT/claude-list-calls" STUB_MUTATIONS="$TEST_ROOT/claude-mutations" STUB_FAIL_ID="" \
+  bash "$TOOLS/install-plugins.sh" --runtime claude --owner test-owner >/dev/null \
+  || { echo 'FAIL: Claude config dir behind a symlink was rejected' >&2; exit 1; }
+ln -s "$CODEX_TEST_CONFIG" "$TEST_ROOT/codex-link"
+: > "$TEST_ROOT/codex-mutations"
+env PATH="$BIN:/usr/bin:/bin" CODEX_HOME="$TEST_ROOT/codex-link" \
+  STUB_CODEX_MARKETPLACES="$TEST_ROOT/codex-marketplaces.json" STUB_CODEX_PLUGINS="$TEST_ROOT/codex-plugins.json" \
+  STUB_MUTATIONS="$TEST_ROOT/codex-mutations" STUB_CODEX_FAIL_ID="" bash "$TOOLS/install-plugins.sh" --runtime codex --owner test-owner >/dev/null \
+  || { echo 'FAIL: CODEX_HOME behind a symlink was rejected' >&2; exit 1; }
+if rg -F 'plugin marketplace remove' "$TEST_ROOT/codex-mutations" >/dev/null; then
+  echo 'FAIL: Codex marketplace behind a symlinked CODEX_HOME was treated as a local registration' >&2; exit 1
+fi
+
+echo 'Install contract self-test: passed (single-value initial JSON/schema fail-closed with zero mutations, mixed Codex local/remote entries, Claude user scope, CLI nonzero, post-state identity/version/source/scope mismatch, symlinked config dir)'

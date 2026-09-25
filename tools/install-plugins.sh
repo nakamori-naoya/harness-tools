@@ -49,6 +49,10 @@ skill-authoring|skill-authoring-plugins|skill-authoring
 
 fail=0
 note() { printf '%s\n' "$*"; }
+# 設定の置き場は symlink のことがある（~/.codex-personal -> ~/.codex）。CLI は実体のパスを返すので、
+# パスは文字列ではなく、symlink を解いた実体のパスで比べる。
+real_path() { python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$1"; }
+same_path() { [ -n "$1" ] && [ -n "$2" ] && [ "$(real_path "$1")" = "$(real_path "$2")" ]; }
 
 validate_claude_marketplaces() {
   printf '%s' "$1" | jq -se '
@@ -136,7 +140,7 @@ install_claude() {
       fi
     done
   done <<<"$MARKETPLACES"
-  local marketplaces installed location expected_version expected_path
+  local marketplaces installed location expected_version expected_path install_path
   if ! marketplaces=$(claude plugin marketplace list --json 2>/dev/null) \
     || ! installed=$(claude plugin list --json 2>/dev/null); then
     echo "[error] Claude導入状態の取得に失敗" >&2; fail=1; return
@@ -153,8 +157,9 @@ install_claude() {
       expected_version=$(jq -er --arg p "$p" '.plugins[] | select(.name == $p) | .version' "$location/.claude-plugin/marketplace.json" 2>/dev/null) \
         || { echo "[error] Claude marketplace catalog identity不明: ${p}@${name}" >&2; fail=1; continue; }
       expected_path="$CLAUDE_CONFIG_DIR/plugins/cache/$name/$p/$expected_version"
-      if printf '%s' "$installed" | jq -e --arg id "${p}@${name}" --arg version "$expected_version" --arg path "$expected_path" \
-        'any(.[]; .id == $id and .scope == "user" and .version == $version and .enabled == true and .installPath == $path)' >/dev/null; then
+      install_path=$(printf '%s' "$installed" | jq -r --arg id "${p}@${name}" --arg version "$expected_version" \
+        'first(.[] | select(.id == $id and .scope == "user" and .version == $version and .enabled == true) | .installPath) // empty')
+      if same_path "$install_path" "$expected_path"; then
         note "  ${p}@${name}: verified version=${expected_version} source=${OWNER}/${repo}"
       else
         echo "[error] Claude plugin登録状態不一致: ${p}@${name}" >&2; fail=1
@@ -179,7 +184,7 @@ install_codex() {
     [ -n "$name" ] || continue
     root=$(printf '%s\n' "$registered" | jq -r --arg name "$name" '.marketplaces[] | select(.name == $name) | .root')
     source=$(printf '%s\n' "$registered" | jq -r --arg name "$name" '.marketplaces[] | select(.name == $name) | .marketplaceSource.source')
-    if [ "$root" = "$CODEX_HOME/.tmp/marketplaces/$name" ] \
+    if same_path "$root" "$CODEX_HOME/.tmp/marketplaces/$name" \
       && [ "$source" = "https://github.com/${OWNER}/${repo}.git" ]; then
       if ! codex plugin marketplace upgrade "$name" >/dev/null 2>&1; then
         echo "[error] marketplace upgrade 失敗: $name" >&2; fail=1; continue
@@ -201,7 +206,7 @@ install_codex() {
       fi
     done
   done <<<"$MARKETPLACES"
-  local marketplaces installed expected_root expected_source catalog source_path expected_version expected_plugin_path
+  local marketplaces installed expected_root expected_source catalog source_path expected_version expected_plugin_path registered_root plugin_path
   if ! marketplaces=$(codex plugin marketplace list --json 2>/dev/null) \
     || ! installed=$(codex plugin list --json 2>/dev/null); then
     echo "[error] Codex導入状態の取得に失敗" >&2; fail=1; return
@@ -213,8 +218,9 @@ install_codex() {
     [ -n "$name" ] || continue
     expected_root="$CODEX_HOME/.tmp/marketplaces/$name"
     expected_source="https://github.com/${OWNER}/${repo}.git"
-    if ! printf '%s' "$marketplaces" | jq -e --arg name "$name" --arg root "$expected_root" --arg source "$expected_source" \
-      'any(.marketplaces[]; .name == $name and .root == $root and .marketplaceSource.sourceType == "git" and .marketplaceSource.source == $source)' >/dev/null; then
+    registered_root=$(printf '%s' "$marketplaces" | jq -r --arg name "$name" --arg source "$expected_source" \
+      'first(.marketplaces[] | select(.name == $name and .marketplaceSource.sourceType == "git" and .marketplaceSource.source == $source) | .root) // empty')
+    if ! same_path "$registered_root" "$expected_root"; then
       echo "[error] Codex marketplace source不一致: $name" >&2; fail=1; continue
     fi
     catalog="$expected_root/.agents/plugins/marketplace.json"
@@ -224,8 +230,9 @@ install_codex() {
       source_path=$(jq -er --arg p "$p" '.plugins[] | select(.name == $p) | .source.path' "$catalog" 2>/dev/null) \
         || { echo "[error] Codex marketplace source path不明: ${p}@${name}" >&2; fail=1; continue; }
       expected_plugin_path="$expected_root/${source_path#./}"
-      if printf '%s' "$installed" | jq -e --arg id "${p}@${name}" --arg version "$expected_version" --arg path "$expected_plugin_path" --arg source "$expected_source" \
-        'any(.installed[]; .pluginId == $id and .version == $version and .installed == true and .enabled == true and .source.source == "local" and .source.path == $path and .marketplaceSource.sourceType == "git" and .marketplaceSource.source == $source)' >/dev/null; then
+      plugin_path=$(printf '%s' "$installed" | jq -r --arg id "${p}@${name}" --arg version "$expected_version" --arg source "$expected_source" \
+        'first(.installed[] | select(.pluginId == $id and .version == $version and .installed == true and .enabled == true and .source.source == "local" and .marketplaceSource.sourceType == "git" and .marketplaceSource.source == $source) | .source.path) // empty')
+      if same_path "$plugin_path" "$expected_plugin_path"; then
         note "  ${p}@${name}: verified version=${expected_version} source=${expected_source}"
       else
         echo "[error] Codex plugin登録状態不一致: ${p}@${name}" >&2; fail=1
