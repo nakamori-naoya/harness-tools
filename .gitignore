@@ -6,7 +6,6 @@ __pycache__/
 # A new top-level path is ignored until it is explicitly approved here.
 /*
 !/.github/
-!/.harness-plugins/
 !/tools/
 !/ci/
 !/scripts/
