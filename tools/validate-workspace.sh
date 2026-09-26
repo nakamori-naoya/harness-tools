@@ -53,8 +53,10 @@ for repository in "$@"; do
   esac
   [ -f "$repository/AGENTS.md" ] \
     || { echo "plugin repository AGENTS.md is missing: $repository/AGENTS.md" >&2; status=1; }
-  [ -f "$repository/CLAUDE.md" ] \
-    || { echo "plugin repository CLAUDE.md is missing: $repository/CLAUDE.md" >&2; status=1; }
+  # Claude Code は AGENTS.md を読まず、CLAUDE.md の `@AGENTS.md` を通してだけ規約を読む。
+  # clone した作業場所にも要るので、手元にあることではなく git が管理していることを求める。
+  git -C "$repository" ls-files --error-unmatch CLAUDE.md >/dev/null 2>&1 \
+    || { echo "plugin repository CLAUDE.md is not tracked by git: $repository/CLAUDE.md" >&2; status=1; }
   if [ -f "$repository/AGENTS.md" ]; then
     rg -Fq "$WORKSPACE/AGENTS.md" "$repository/AGENTS.md" \
       || { echo "plugin AGENTS.md does not reference workspace AGENTS.md: $repository/AGENTS.md -> $WORKSPACE/AGENTS.md" >&2; status=1; }
