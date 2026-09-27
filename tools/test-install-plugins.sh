@@ -12,7 +12,7 @@ mkdir -p "$BIN" "$CLAUDE_TEST_CONFIG/plugins/marketplaces" "$CLAUDE_TEST_CONFIG/
   "$CODEX_TEST_CONFIG/.tmp/marketplaces"
 
 CATALOG='grill|grill-plugins|grill
-agent-work-policy|agent-work-policy-plugins|agent-work-policy
+git-work-policy|agent-work-policy-plugins|git-work-policy
 write-doc|write-doc-plugins|write-doc
 rdb-design|rdb-design-plugins|rdb-design
 product-planning|product-planning-plugins|product-planning
