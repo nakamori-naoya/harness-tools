@@ -16,7 +16,7 @@ harness-pluginsv2 の全 plugin repository が共有する保守 tool を、一�
 | `tools/test-hardening.py` | release.py の回帰検査。`--repository` を渡すと、その repository の CI の action が SHA で固定されているかも見る |
 | `tools/install-plugins.sh` | GitHub の marketplace 経由で全 plugin を Claude Code と Codex へ導入し、導入後の version と source を照合する |
 | `tools/test-install-plugins.sh` | install-plugins.sh の照合を stub の CLI で検査する |
-| `tools/grade-eval.sh` | `claude plugin eval` が残した作業場所の成果物を、別の Claude（採点役）に条件ごとに判定させ、3 回の多数決と条件の重みから 100 点満点の点数を出す。どの plugin の evals からも呼べる |
+| `tools/grade-eval.sh` | `claude plugin eval` が残した作業場所の成果物を、作業した担当とは別の採点役（既定は Claude、`GRADE_ENGINE=codex` で Codex）に条件ごとに判定させ、3 回の多数決と条件の重みから 100 点満点の点数を出す。どの plugin の evals からも呼べる |
 | `tools/grade-eval-score.py` | grade-eval.sh が残した採点役の各回の結果から、多数決と点数を出し直す |
 | `ci/validate.sh` | CI の共通の step。配置の検査と、その repository の `scripts/validate.sh` を実行する |
 | `ci/install-requirements.sh` | GitHub Actions の runner へ yq、jq、ripgrep を入れる |
@@ -43,6 +43,8 @@ plugin の evals は、`claude plugin eval` で資料を作らせ、`tools/grade
 ```bash
 bash ../harness-tools/tools/grade-eval.sh <ケースの絶対パス> <plugin eval の kept temp の絶対パス> [expected.md の絶対パス]
 ```
+
+採点役を Codex にするときは、`GRADE_ENGINE=codex` を付ける。条件、採点役への指示、多数決、点数の出し方は Claude と同じで、起動だけが違う。Codex は権限の profile で、読める場所をシステムの最小限と採点用のディレクトリに絞る。ただし一時ディレクトリは読めるので、採点用のディレクトリの外に触れたコマンドがあれば、点数と一緒に警告を出す。Codex の費用はドルでは出ず、使ったトークン数を出す。
 
 ## CI の兄弟 checkout
 

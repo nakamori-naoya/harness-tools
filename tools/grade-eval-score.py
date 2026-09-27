@@ -5,23 +5,36 @@
 <結果の名前の基> は `evals/results/grading/<ケース>-<時刻>` で、その `.criteria.md`（重み付きの条件）と
 `.vote<N>.json`（採点役の各回の出力）を読み、`.md`（採点の報告）を書く。
 """
-import json, re, sys
+import json, os, re, sys
 base, runs = sys.argv[1], int(sys.argv[2])
 expected = sys.argv[3] if len(sys.argv) > 3 else ""
 criteria = open(f"{base}.criteria.md").read()
 weights = dict((cid, int(w)) for cid, w in re.findall(r"^### (\S+)\n\n重み: (\d+)", criteria, re.M))
 order = list(weights)
 
-votes, reasons, cost = {c: [] for c in order}, {c: {} for c in order}, 0.0
+votes, reasons, cost, tokens, outside = {c: [] for c in order}, {c: {} for c in order}, 0.0, 0, []
+failed = []
 for i in range(1, runs + 1):
-    result = json.load(open(f"{base}.vote{i}.json"))
+    # 起動が失敗した回、出力が読めない回、判定を一つも書かなかった回は、失敗として数え、その回の票は無いものとする。
+    try:
+        result = json.load(open(f"{base}.vote{i}.json", encoding="utf-8"))
+    except (OSError, ValueError):
+        failed.append(i)
+        continue
+    if os.path.exists(f"{base}.vote{i}.failed"):
+        failed.append(i)
     cost += result.get("total_cost_usd", 0) or 0
+    usage = result.get("usage") or {}
+    tokens += (usage.get("input_tokens") or 0) + (usage.get("output_tokens") or 0)
+    outside += result.get("outside_commands") or []
     text = result.get("result") or ""
     open(f"{base}.vote{i}.md", "w").write(text)
-    for cid, verdict, body in re.findall(r"^### (\S+)[ \t]*\n\s*判定:\s*(PASS|FAIL)[ \t]*\n(.*?)(?=^### |^合計|\Z)", text, re.M | re.S):
+    for cid, verdict, body in re.findall(r"^#{2,4} `?([\w-]+)`?[ \t]*\n\s*\**判定\**[:：]\**\s*\**(PASS|FAIL)\**[ \t]*\n(.*?)(?=^#{2,4} |^\**合計|\Z)", text, re.M | re.S):
         if cid in votes:
             votes[cid].append(verdict)
             reasons[cid].setdefault(verdict, body.strip())
+    if i not in failed and not re.search(r"判定\**[:：]", text):
+        failed.append(i)
 
 def majority(vs):
     # 票が足りない条件（採点役が書き落とした、資料が無い）は FAIL に数える。
@@ -35,7 +48,7 @@ band = "実用に足る" if score >= 85 else "手直しで使える" if score >=
 lost = sorted((c for c in order if final[c] == "FAIL"), key=lambda c: (-weights[c], order.index(c)))
 
 lines = [f"# 採点：{base.rsplit('/', 1)[-1]}", "",
-         f"点数は {score} 点（{got}/{total}）で、帯は「{band}」である。採点役を {runs} 回回し、条件ごとに多数決を取った。費用は ${cost:.2f} だった。", ""]
+         f"点数は {score} 点（{got}/{total}）で、帯は「{band}」である。採点役を {runs} 回回し、条件ごとに多数決を取った（失敗した回 {len(failed)}）。費用は ${cost:.2f}" + (f"、トークンは {tokens:,}" if tokens else "") + " だった。", ""]
 if lost:
     lines += ["## 減点の大きかった条件", ""]
     for c in lost:
@@ -45,7 +58,11 @@ lines += [f"| {c} | {weights[c]} | {' '.join(votes[c]) or 'なし'} | {final[c]}
 open(f"{base}.md", "w").write("\n".join(lines) + "\n")
 
 print(f"採点の報告: {base}.md")
-print(f"点数: {score}（{got}/{total}） 帯: {band}  採点役: {runs} 回  費用: ${cost:.2f}")
+print(f"点数: {score}（{got}/{total}） 帯: {band}  採点役: {runs} 回（失敗 {len(failed)} 回）  費用: ${cost:.2f}" + (f"  トークン: {tokens:,}" if tokens else ""))
+if failed:
+    print(f"警告: 採点役の {', '.join(map(str, failed))} 回目が失敗した。その回の票は無いものとし、票の足りない条件は FAIL に数えた")
+if outside:
+    print(f"警告: 採点役が採点用のディレクトリの外に触れたコマンドが {len(outside)} 件ある（{base}.vote<N>.json の outside_commands）")
 for c in lost:
     print(f"減点\t{c}\t重み {weights[c]}\t票 {' '.join(votes[c]) or 'なし'}")
 if expected:

@@ -65,6 +65,27 @@ bash "$ROOT/tools/grade-eval.sh" >/dev/null 2>&1; [ "$?" -eq 2 ] && pass 'grade-
 bash "$ROOT/tools/grade-eval.sh" relative/case relative/work >/dev/null 2>&1; [ "$?" -eq 2 ] && pass 'grade-eval.sh は絶対パス必須' || fail 'grade-eval.sh が相対パスで動いた'
 mkdir -p "$TMP_ROOT/grade/case/grading" "$TMP_ROOT/grade/work"
 bash "$ROOT/tools/grade-eval.sh" "$TMP_ROOT/grade/case" "$TMP_ROOT/grade/work" >/dev/null 2>&1; [ "$?" -eq 2 ] && pass 'grade-eval.sh は固有の条件の無いケースを拒否' || fail 'grade-eval.sh が固有の条件無しで動いた'
+GRADE_ENGINE=other bash "$ROOT/tools/grade-eval.sh" "$TMP_ROOT/grade/case" "$TMP_ROOT/grade/work" >/dev/null 2>&1; [ "$?" -eq 2 ] && pass 'grade-eval.sh は知らない採点役を拒否' || fail 'grade-eval.sh が知らない採点役で動いた'
+
+section 'tools/grade-eval.sh の正例（偽の採点役で、同時の採点と失敗した回）'
+g="$TMP_ROOT/grade-ok"
+mkdir -p "$g/evals/criteria" "$g/evals/topic/case/grading" "$g/evals/topic/materials" "$g/work/out" "$g/bin"
+printf '# 指示\n' > "$g/evals/criteria/brief.md"
+printf '# 共通\n\n### only\n\n重み: 1\n\nPASS：x\n\nFAIL：y\n' > "$g/evals/criteria/kind.md"
+printf '<!-- common: kind -->\n<!-- document: out/doc.md -->\n\n# 固有\n' > "$g/evals/topic/case/grading/criteria.md"
+printf 'doc\n' > "$g/work/out/doc.md"
+printf 'req\n' > "$g/evals/topic/materials/req.md"
+cat > "$g/bin/claude" <<'SHIM'
+#!/usr/bin/env bash
+if [ -n "${SHIM_FAIL_DIR:-}" ] && mkdir "$SHIM_FAIL_DIR" 2>/dev/null; then exit 1; fi
+printf '{"result":"### only\\n判定: PASS\\n根拠: x\\n理由: y\\n","total_cost_usd":0}\n'
+SHIM
+chmod +x "$g/bin/claude"
+( PATH="$g/bin:$PATH" SHIM_FAIL_DIR="$g/failed-once" TMPDIR="$TMP_ROOT" bash "$ROOT/tools/grade-eval.sh" "$g/evals/topic/case" "$g/work" >"$g/a.out" 2>&1 ) &
+( PATH="$g/bin:$PATH" TMPDIR="$TMP_ROOT" bash "$ROOT/tools/grade-eval.sh" "$g/evals/topic/case" "$g/work" >"$g/b.out" 2>&1 ) &
+wait
+rg -q '点数: 100.0' "$g/a.out" && rg -q '失敗 1 回' "$g/a.out" && pass 'grade-eval.sh は失敗した回があっても点数を出す' || { cat "$g/a.out" >&2; fail 'grade-eval.sh が失敗した回で点数を出さなかった'; }
+rg -q '点数: 100.0' "$g/b.out" && rg -q '失敗 0 回' "$g/b.out" && pass 'grade-eval.sh は同時に採点しても結果が混ざらない' || { cat "$g/b.out" >&2; fail 'grade-eval.sh の同時の採点が混ざった'; }
 
 section 'ci/validate.sh の正例（最小の plugin repository）'
 fixture="$TMP_ROOT/fixture-plugins"
