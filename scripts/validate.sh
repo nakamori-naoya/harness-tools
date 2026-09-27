@@ -61,6 +61,11 @@ bash "$ROOT/ci/validate.sh" "$TMP_ROOT/missing" >/dev/null 2>&1; [ "$?" -eq 2 ] 
 mkdir -p "$TMP_ROOT/no-validate"
 bash "$ROOT/ci/validate.sh" "$TMP_ROOT/no-validate" >/dev/null 2>&1; [ "$?" -eq 2 ] && pass 'ci/validate.sh は scripts/validate.sh の無い repository を拒否' || fail 'ci/validate.sh が validate.sh 無しで動いた'
 
+bash "$ROOT/tools/grade-eval.sh" >/dev/null 2>&1; [ "$?" -eq 2 ] && pass 'grade-eval.sh は引数必須' || fail 'grade-eval.sh が引数無しで動いた'
+bash "$ROOT/tools/grade-eval.sh" relative/case relative/work >/dev/null 2>&1; [ "$?" -eq 2 ] && pass 'grade-eval.sh は絶対パス必須' || fail 'grade-eval.sh が相対パスで動いた'
+mkdir -p "$TMP_ROOT/grade/case/grading" "$TMP_ROOT/grade/work"
+bash "$ROOT/tools/grade-eval.sh" "$TMP_ROOT/grade/case" "$TMP_ROOT/grade/work" >/dev/null 2>&1; [ "$?" -eq 2 ] && pass 'grade-eval.sh は固有の条件の無いケースを拒否' || fail 'grade-eval.sh が固有の条件無しで動いた'
+
 section 'ci/validate.sh の正例（最小の plugin repository）'
 fixture="$TMP_ROOT/fixture-plugins"
 mkdir -p "$fixture/.claude-plugin" "$fixture/.agents/plugins" "$fixture/plugins/fixture/.claude-plugin" "$fixture/plugins/fixture/.codex-plugin" "$fixture/plugins/fixture/skills/do-work" "$fixture/scripts"
