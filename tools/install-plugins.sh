@@ -29,7 +29,7 @@ export CODEX_HOME="${CODEX_HOME:-$HOME/.codex-personal}"
 # marketplace 名 | GitHub repository | その marketplace が公開する plugin（空白区切り）
 MARKETPLACES='
 grill|grill-plugins|grill
-agent-work-policy|agent-work-policy-plugins|agent-work-policy
+git-work-policy|agent-work-policy-plugins|git-work-policy
 write-doc|write-doc-plugins|write-doc
 rdb-design|rdb-design-plugins|rdb-design
 product-planning|product-planning-plugins|product-planning
