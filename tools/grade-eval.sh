@@ -14,12 +14,19 @@
 #
 # <作業場所> は、--keep-temp で残した一時ディレクトリ（例 /private/tmp/e-XXXX）か、
 # 資料と記録を作業場所と同じ形で置いたディレクトリ（較正の資料など）である。
+# 較正の資料に実行の担当の最後の報告を置くときは、plugin eval の記録と同じ形で、そのディレクトリの
+# out/trace.jsonl に {"type":"result","result":"<報告>"} の一行を置く。
 # 採点役は Read、Glob、Grep だけを使い、写しを置いた採点用のディレクトリの中だけを読める。
 # 残した作業場所の中では何も実行しない（git の設定を読ませないため）。成果物は写してから読む。
 # 採点役は既定で3回、互いに独立に回し、条件ごとに多数決を取る。多数決の判定に条件の重みを掛け、
 # 100点満点の点数にする。expected.md を渡すと、多数決の判定と条件ごとに突き合わせ、一致の数を出す。
 #
-# 環境変数: GRADE_MODEL（既定 sonnet）、GRADE_RUNS（既定 3、奇数）、GRADE_MAX_BUDGET_USD（1回あたり、既定 2）
+# 採点役は Claude（既定）か Codex から選ぶ。条件、採点役への指示、多数決、点数の出し方は同じで、起動だけが違う。
+# Codex は、権限の profile で読める場所をシステムの最小限と採点用のディレクトリに絞る。ただし一時ディレクトリは
+# 読めてしまうので、Codex がそれ以外に触れたコマンドを記録から数えて警告する。
+#
+# 環境変数: GRADE_ENGINE（claude か codex、既定 claude）、GRADE_MODEL（既定は claude なら sonnet、codex なら gpt-6-sol）、
+#           GRADE_RUNS（既定 3、奇数）、GRADE_MAX_BUDGET_USD（claude の1回あたり、既定 2）
 set -euo pipefail
 
 usage() { echo "使い方: bash tools/grade-eval.sh <ケースのディレクトリの絶対パス> <作業場所の絶対パス> [expected.md の絶対パス]" >&2; exit 2; }
@@ -30,7 +37,12 @@ for arg in "$@"; do case "$arg" in /*) ;; *) usage ;; esac; done
 CASE_DIR=$(cd "$1" && pwd)
 KEPT=$2
 EXPECTED=${3:-}
-MODEL=${GRADE_MODEL:-sonnet}
+ENGINE=${GRADE_ENGINE:-claude}
+case "$ENGINE" in
+  claude) MODEL=${GRADE_MODEL:-sonnet} ;;
+  codex) MODEL=${GRADE_MODEL:-gpt-6-sol} ;;
+  *) echo "GRADE_ENGINE は claude か codex にする: $ENGINE" >&2; exit 2 ;;
+esac
 RUNS=${GRADE_RUNS:-3}
 BUDGET=${GRADE_MAX_BUDGET_USD:-2}
 [ $((RUNS % 2)) -eq 1 ] || { echo "GRADE_RUNS は多数決が割れない奇数にする: $RUNS" >&2; exit 2; }
@@ -65,7 +77,8 @@ CASE_NAME=$(basename "$CASE_DIR")
 RESULTS="$EVALS_DIR/results/grading"
 mkdir -p "$RESULTS"
 STAMP=$(date -u +%Y-%m-%dT%H-%M-%SZ)
-BASE="$RESULTS/$CASE_NAME-$STAMP"
+# 同じケースを同じ秒に二つ採点しても各回のファイルが混ざらないよう、名前に pid と乱数を足す。
+BASE="$RESULTS/$CASE_NAME-$STAMP-$ENGINE-$$-$RANDOM"
 
 # 条件をつなげる。資料が無いときは、止まったときに判定する条件だけを残し、それも無ければ採点役を呼ばず0点にする。
 CRITERIA=$(cat "$COMMON"; [ -f "$TOPIC" ] && printf '\n---\n\n' && cat "$TOPIC"; printf '\n---\n\n'; grep -v '^<!-- ' "$SPECIFIC")
@@ -110,9 +123,9 @@ TARGET=$(printf '## この採点の対象\n\n- 判定する資料: `work/%s`\n' 
 PROMPT=$(printf '%s\n\n%s\n\n---\n\n%s\n' "$(cat "$BRIEF")" "$TARGET" "$CRITERIA")
 printf '%s\n' "$CRITERIA" > "$BASE.criteria.md"
 
-# 採点役は採点用のディレクトリを作業場所にし、そこから外は読めない。回ごとに独立に並べて走らせる。
-pids=()
-for i in $(seq 1 "$RUNS"); do
+# 採点役は採点用のディレクトリを作業場所にし、回ごとに独立に並べて走らせる。各回の結果は、どちらの採点役でも
+# "$BASE.vote<N>.json"（result に最後の返答、total_cost_usd と usage に費用）にそろえる。
+vote_claude() {
   (cd "$STAGE" && claude -p "$PROMPT" \
     --model "$MODEL" \
     --restricted --strict-mcp-config \
@@ -121,9 +134,46 @@ for i in $(seq 1 "$RUNS"); do
     --permission-mode dontAsk \
     --no-session-persistence \
     --max-budget-usd "$BUDGET" \
-    --output-format json < /dev/null) > "$BASE.vote$i.json" &
+    --output-format json < /dev/null) > "$BASE.vote$1.json" || echo "$?" > "$BASE.vote$1.failed"
+}
+vote_codex() {
+  (cd "$STAGE" && codex exec --json -m "$MODEL" \
+    -c 'default_permissions="grade_eval"' \
+    -c "permissions.grade_eval.filesystem={\":minimal\"=\"read\", \"$STAGE\"=\"read\"}" \
+    -C "$STAGE" --skip-git-repo-check \
+    -o "$BASE.vote$1.last.md" "$PROMPT" < /dev/null) > "$BASE.vote$1.events.jsonl" 2> "$BASE.vote$1.err" || echo "$?" > "$BASE.vote$1.failed"
+  python3 - "$BASE.vote$1" "$STAGE" <<'PY'
+import json, re, sys
+base, stage = sys.argv[1], sys.argv[2]
+try:
+    text = open(f"{base}.last.md").read()
+except FileNotFoundError:
+    text = ""
+usage, outside = {}, []
+system = ("/bin/", "/usr/", "/dev/", "/etc/", "/System/", "/Library/", "/opt/", "/sbin/")
+for line in open(f"{base}.events.jsonl"):
+    try:
+        event = json.loads(line)
+    except ValueError:
+        continue
+    if event.get("type") == "turn.completed":
+        for key, value in (event.get("usage") or {}).items():
+            usage[key] = usage.get(key, 0) + value
+    item = event.get("item") or {}
+    if event.get("type") == "item.completed" and item.get("type") == "command_execution":
+        for path in re.findall(r"(?<![\w.])/[^\s'\"|;&<>]+", item.get("command") or ""):
+            if not path.startswith(stage) and not path.startswith(system):
+                outside.append(item["command"])
+                break
+json.dump({"result": text, "total_cost_usd": 0, "usage": usage, "outside_commands": outside}, open(f"{base}.json", "w"), ensure_ascii=False)
+PY
+}
+pids=()
+for i in $(seq 1 "$RUNS"); do
+  "vote_$ENGINE" "$i" &
   pids+=($!)
 done
-for pid in "${pids[@]}"; do wait "$pid"; done
+# 失敗した回があっても止まらず、その回の票は無いものとして点数を出す（票の足りない条件は FAIL に数える）。
+for pid in "${pids[@]}"; do wait "$pid" || true; done
 
 python3 "$(dirname "${BASH_SOURCE[0]}")/grade-eval-score.py" "$BASE" "$RUNS" "$EXPECTED"
