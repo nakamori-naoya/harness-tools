@@ -45,6 +45,7 @@ react-convention|react-convention-plugins|react-convention
 agent-fleet|agent-fleet-plugins|agent-fleet-core agent-fleet-herdr
 agent-roles|agent-roles-plugins|agent-roles
 skill-authoring|skill-authoring-plugins|skill-authoring
+security-design|security-design-plugins|security-design
 '
 
 fail=0
